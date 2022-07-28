@@ -5,6 +5,9 @@ NOT_SPAM = 0
 SPAM = 1
 TOTAL = 2
 NUM_CLASSES = 2 # NOT_SPAM/SPAM
+TRAINING = 0
+TEST = 1
+
 
 # def calc_mean(data):
 #     means = []
@@ -44,28 +47,26 @@ for file in range(2):
         for row in reader:
             data_row = []
             # Cast values to float and append to data_row
-            for i in range(len(row)):
-                data_row.append(float(row[i]))
-            # Last value (classifier) cast to int and append to data_row
-            data_row.append(int(row[len(row)-1]))
+            for feature in range(len(row)):
+                data_row.append(float(row[feature]))
             # Count spam/not-spam, pop the classifier value off the data_row, 
             # append data_row to spam or not_spam array
             if data_row[len(row)-1] == NOT_SPAM:
                 # If training_data, add one to 'not spam' count
-                if file == 0:
+                if file == TRAINING:
                     count[NOT_SPAM] += 1
                 # Pop last element (data_class)
                 data_row.pop()
                 not_spam_data.append(data_row)
             else:
                 # If training_data, add one to 'spam' count
-                if file == 0:
+                if file == TRAINING:
                     count[SPAM] += 1
                 # Pop last element (data_class)
                 data_row.pop()
                 spam_data.append(data_row)
-        # If training file is being loaded, append the two arrays to training_data
-        if file == 0:
+        # If training file is being loaded, append the two arrays to training_data    
+        if file == TRAINING:
             training_data.append(not_spam_data)
             training_data.append(spam_data)
         # If test file is being loaded, append the two arrays to test_data
