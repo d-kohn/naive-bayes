@@ -1,17 +1,19 @@
 import csv
 import numpy as np
 
-SPAM = 1
 NOT_SPAM = 0
+SPAM = 1
+TOTAL = 2
+NUM_CLASSES = 2 # NOT_SPAM/SPAM
 
-count = [0,0]
+count = [0] * (NUM_CLASSES + 1) # NOT_SPAM/SPAM/TOTAL
 training_data = []
-training_targets = []
 test_data = []
-test_targets = []
 
 # Load training data
 with open('./data/training.csv', newline='') as csvfile:
+    spam_data = []
+    not_spam_data = []
     reader = csv.reader(csvfile, delimiter=',')
     for row in reader:
         data_row = []
@@ -23,14 +25,25 @@ with open('./data/training.csv', newline='') as csvfile:
         data_row.append(int(row[len(row)-2]))
         data_row.append(int(row[len(row)-1]))
         # Count spam/not-spam
-        if data_row[len(row)-1] == 0:
+        if data_row[len(row)-1] == NOT_SPAM:
             count[NOT_SPAM] += 1
+            # Pop last element (data_class)
+            data_row.pop()
+            not_spam_data.append(data_row)
         else:
             count[SPAM] += 1
-        training_data.append(data_row)
+            # Pop last element (data_class)
+            data_row.pop()
+            spam_data.append(data_row)
+    training_data.append(not_spam_data)
+    training_data.append(spam_data)
+
+count[TOTAL] = sum(count)
 
 # Load test data
 with open('./data/test.csv', newline='') as csvfile:
+    spam_data = []
+    not_spam_data = []
     reader = csv.reader(csvfile, delimiter=',')
     for row in reader:
         data_row = []
@@ -41,26 +54,102 @@ with open('./data/test.csv', newline='') as csvfile:
         data_row.append(int(row[len(row)-3]))
         data_row.append(int(row[len(row)-2]))
         data_row.append(int(row[len(row)-1]))
-        test_data.append(data_row)
+        if data_row[len(row)-1] == NOT_SPAM:
+            # Pop last element (data_class)
+            data_row.pop()
+            not_spam_data.append(data_row)
+        else:
+            # Pop last element (data_class)
+            data_row.pop()
+            spam_data.append(data_row)
+    test_data.append(not_spam_data)
+    test_data.append(spam_data)
 
-# Array location of the output target
-TARGET = len(training_data[0])-1
+# Number of features in the data
+FEATURES = len(training_data[0][0])-1
+
 # Calculate starting prior probability for SPAM and NOT_SPAM
-prior = [0.0,0.0]
-prior[SPAM] = count[SPAM] / sum(count)
-prior[NOT_SPAM] = count[NOT_SPAM] / sum(count)
+p_prior = [0.0] * NUM_CLASSES
+p_prior[SPAM] = np.log(count[SPAM] / count[TOTAL]) 
+p_prior[NOT_SPAM] = np.log(count[NOT_SPAM] / count[TOTAL])
 
 mean = []
 stddev = []
-# Transpose the training data array so features are in the same row.
-# Calculate the mean and standard deviation for each feature.
-tmp = np.transpose(training_data)
-for row in tmp:
-    mean.append(np.mean(row))
-    stddev.append(np.std(row))
-    # If the std deviation is 0, set it to 0.0001
-    if stddev[len(stddev)-1] == 0:
-        stddev[len(stddev)-1] = 0.0001
+# Transpose the training data array for each data class so features are 
+# on the same row. Calculate the mean and standard deviation for each feature.
+for data_class in range(NUM_CLASSES):
+    tmp = np.transpose(training_data[data_class])
+    tmp_mean = []
+    tmp_stddev = []
+    # Iterate over each feature row in the transposed temp array
+    for row in tmp:
+        # Calculate mean and std deviation for each row
+        tmp_mean.append(np.mean(row))
+        std_deviation = np.std(row)
+        # If the std deviation is 0, set it to 0.0001
+        if std_deviation == 0:
+            tmp_stddev.append(0.0001)
+        else:
+            tmp_stddev.append(std_deviation)
+    mean.append(tmp_mean)
+    stddev.append(tmp_stddev)
 
+set = {0:"Training", 1:"Test"}
+all_data = []
+all_data.append(training_data)
+all_data.append(test_data)
+CORRECT = 0
+INCORRECT = 1
 
+# -- CHECKING TEST DATA -- 
+# Iterate over each data_class lists (SPAM/NOT_SPAM)
+for q in range(2):
+    # Array for storing correct and incorrect identification of classes
+    score = [[0,0],[0,0]]
 
+    # Array for storing P(x|class) calculations
+    p_likelyhood = [[0 for i in range(FEATURES)] for j in range(NUM_CLASSES)]
+    # Array for storing P(SPAM) and P(NOT_SPAM) values
+    p_class = [0.0] * NUM_CLASSES
+
+    for data_class in range(NUM_CLASSES):
+        # Iterate over each row of data in the current data_class list
+        for data in all_data[q][data_class]:
+            # Calculate P(class) for both 'calc_class' classes (SPAM/NOT_SPAM)
+            for calc_class in range(NUM_CLASSES):
+                # Calculate the likelyhood - P(x|class) - for each feature
+                for feature in range(FEATURES):
+                    std = stddev[calc_class][feature]
+                    mu = mean[calc_class][feature]
+                    x = data[feature]
+                    exp = -(np.power(x - mu, 2) / (2 * np.power(std, 2)))
+                    gnb = ( (np.e**(exp)) / (np.sqrt(2*np.pi)*std)) 
+                    if (gnb) != 0:
+                        p_likelyhood[calc_class][feature] = np.log(gnb)
+                    else:
+                        p_likelyhood[calc_class][feature] = -np.inf
+    #                print (f"Gaussian: {gnb}, STD: {std}, MU: {mu}, X: {x}, NUMERATOR: {num}, DENOMINATOR: {denom}, EXP: {exp}")
+            # Store the P(class) 
+            p_class[SPAM] = p_prior[SPAM]+sum(p_likelyhood[SPAM])
+            p_class[NOT_SPAM] = p_prior[NOT_SPAM]+sum(p_likelyhood[NOT_SPAM])
+
+            # Score the result
+            if(p_class[SPAM] > p_class[NOT_SPAM]):
+                if (data_class == SPAM):
+                    score[SPAM][CORRECT] += 1
+                else:
+                    score[SPAM][INCORRECT] += 1
+            else:
+                if (data_class == NOT_SPAM):
+                    score[NOT_SPAM][CORRECT] += 1
+                else:
+                    score[NOT_SPAM][INCORRECT] += 1
+
+    print(f"RESULTS - {set[q]}:")
+    print(f"Correctly identified SPAM:\t{score[SPAM][CORRECT]}")
+    print(f"Identified SPAM as NOT SPAM: \t{score[NOT_SPAM][INCORRECT]}")
+    print(f"Correctly identified NOT SPAM:\t{score[NOT_SPAM][CORRECT]}")
+    print(f"Identified NOT SPAM as SPAM:\t{score[SPAM][INCORRECT]}")
+    print()
+
+        
