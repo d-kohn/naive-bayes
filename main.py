@@ -102,7 +102,7 @@ CORRECT = 0
 INCORRECT = 1
 
 # -- CHECKING TEST DATA -- 
-# Iterate over each data_class lists (SPAM/NOT_SPAM)
+# Iterate over each data_class lists (Training/Test)
 for q in range(2):
     # Array for storing correct and incorrect identification of classes
     score = [[0,0],[0,0]]
