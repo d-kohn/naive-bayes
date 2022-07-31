@@ -128,5 +128,3 @@ print(f"Correctly identified SPAM:\t{score[SPAM][CORRECT]}")
 print(f"Identified SPAM as NOT SPAM: \t{score[NOT_SPAM][INCORRECT]}")
 print(f"Correctly identified NOT SPAM:\t{score[NOT_SPAM][CORRECT]}")
 print(f"Identified NOT SPAM as SPAM:\t{score[SPAM][INCORRECT]}")
-
-        w
